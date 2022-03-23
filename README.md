@@ -132,3 +132,6 @@ func newRemoveClient(client string) *message {
   - connections
     - closeConnection
     - clientConnect
+
+## connection
+
