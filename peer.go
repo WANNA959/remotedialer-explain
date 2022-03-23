@@ -19,6 +19,13 @@ var (
 	ID    = "X-API-Tunnel-ID"
 )
 
+/*
+创建一个peer
+若存在
+	不等于新创建的peer，cancel
+	等于，直接return
+不存在，start
+*/
 func (s *Server) AddPeer(url, id, token string) {
 	if s.PeerID == "" || s.PeerToken == "" {
 		return
@@ -37,10 +44,12 @@ func (s *Server) AddPeer(url, id, token string) {
 	s.peerLock.Lock()
 	defer s.peerLock.Unlock()
 
+	// 判断是否相等
 	if p, ok := s.peers[id]; ok {
 		if p.equals(peer) {
 			return
 		}
+		// 不相等cancel
 		p.cancel()
 	}
 
@@ -71,11 +80,13 @@ func (p peer) equals(other peer) bool {
 }
 
 func (p *peer) start(ctx context.Context, s *Server) {
+	// 创建header
 	headers := http.Header{
 		ID:    {s.PeerID},
 		Token: {s.PeerToken},
 	}
 
+	// 创建websocket client dialer
 	dialer := &websocket.Dialer{
 		TLSClientConfig: &tls.Config{
 			InsecureSkipVerify: true,
@@ -91,6 +102,7 @@ outer:
 		default:
 		}
 
+		// 尝试和websocket建立连接
 		metrics.IncSMTotalAddPeerAttempt(p.id)
 		ws, _, err := dialer.Dial(p.url, headers)
 		if err != nil {
@@ -98,8 +110,10 @@ outer:
 			time.Sleep(5 * time.Second)
 			continue
 		}
+		// 成功建立websocket连接
 		metrics.IncSMTotalPeerConnected(p.id)
 
+		//
 		session := NewClientSession(func(string, string) bool { return true }, ws)
 		session.dialer = func(ctx context.Context, network, address string) (net.Conn, error) {
 			parts := strings.SplitN(network, "::", 2)

@@ -35,6 +35,7 @@ func newConnection(connID int64, session *Session, proto, address string) *conne
 }
 
 func (c *connection) tunnelClose(err error) {
+	// 从websocket删除的connection
 	metrics.IncSMTotalRemoveConnectionsForWS(c.session.clientKey, c.addr.Network(), c.addr.String())
 	c.writeErr(err)
 	c.doTunnelClose(err)

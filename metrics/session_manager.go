@@ -10,7 +10,29 @@ const metricsEnv = "CATTLE_PROMETHEUS_METRICS"
 
 var prometheusMetrics = false
 
+/*
+prometheus
+
+It provides metrics primitives to instrument code for monitoring
+It also offers a registry for metrics
+*/
 var (
+	// NewCounterVec creates a new CounterVec based on the provided CounterOpts and
+	// partitioned by the given label names.
+
+	/*
+			exports metrics Counter(计数器
+			计数器是一种累积度量，表示单个单调递增的计数器，其值只能在重新启动时增加或重置为零。
+			例如，您可以使用计数器来表示已服务的请求数、已完成的任务数或错误数。
+			不要使用计数器暴露可能减少的值
+
+		其它类型metric：
+		Gauge：标尺是一种度量，它代表一个可以任意上下变化的数值。仪表通常用于测量温度或当前内存使用情况等值，但也可以“计数”，如并发请求的数量。
+		Histogram：直方图对观察结果进行采样(通常是请求持续时间或响应大小)。它还提供了所有观测值的总和。
+		Summary：类似于直方图，摘要采样观察结果(通常是请求持续时间和响应大小)。虽然它还提供了观察总数和所有观察值的总和，但它在滑动时间窗口上计算可配置的分位数。
+	*/
+
+	// 定义若干个计数器（只增
 	TotalAddWS = prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Subsystem: "session_server",
@@ -101,6 +123,7 @@ var (
 // Register registers a series of session
 // metrics for Prometheus.
 func Register() {
+	// Metrics have to be registered to be exposed:
 
 	prometheusMetrics = true
 
@@ -165,6 +188,7 @@ func AddSMTotalTransmitErrorBytesOnWS(clientKey string, size float64) {
 }
 
 func AddSMTotalTransmitBytesOnWS(clientKey string, size float64) {
+	// + size
 	if prometheusMetrics {
 		TotalTransmitBytesOnWS.With(
 			prometheus.Labels{
@@ -183,6 +207,8 @@ func AddSMTotalReceiveBytesOnWS(clientKey string, size float64) {
 }
 
 func IncSMTotalAddConnectionsForWS(clientKey, proto, addr string) {
+
+	// inc 请求数加1
 	if prometheusMetrics {
 		TotalAddConnectionsForWS.With(
 			prometheus.Labels{

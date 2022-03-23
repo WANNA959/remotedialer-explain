@@ -16,6 +16,7 @@ import (
 )
 
 const (
+	// auto increase
 	Data messageType = iota + 1
 	Connect
 	Error
@@ -48,19 +49,26 @@ type message struct {
 	address     string
 }
 
+// 产生递增uid
 func nextid() int64 {
 	return atomic.AddInt64(&idCounter, 1)
 }
 
+/*
+各种messageType的message instance
+*/
+
+//data类型
 func newMessage(connID int64, bytes []byte) *message {
 	return &message{
 		id:          nextid(),
 		connID:      connID,
 		messageType: Data,
-		bytes:       bytes,
+		bytes:       bytes, //data
 	}
 }
 
+// pause类型
 func newPause(connID int64) *message {
 	return &message{
 		id:          nextid(),
@@ -69,6 +77,7 @@ func newPause(connID int64) *message {
 	}
 }
 
+//  resume类型
 func newResume(connID int64) *message {
 	return &message{
 		id:          nextid(),
@@ -77,6 +86,7 @@ func newResume(connID int64) *message {
 	}
 }
 
+// connect类型 和解码一致：fmt.Sprintf("%s/%s", proto, address)
 func newConnect(connID int64, proto, address string) *message {
 	return &message{
 		id:          nextid(),
@@ -88,6 +98,7 @@ func newConnect(connID int64, proto, address string) *message {
 	}
 }
 
+// error类型
 func newErrorMessage(connID int64, err error) *message {
 	return &message{
 		id:          nextid(),
@@ -98,42 +109,50 @@ func newErrorMessage(connID int64, err error) *message {
 	}
 }
 
+// AddClient类型
 func newAddClient(client string) *message {
 	return &message{
 		id:          nextid(),
 		messageType: AddClient,
 		address:     client,
-		bytes:       []byte(client),
+		bytes:       []byte(client), //clientKey
 	}
 }
 
+// RemoveClient类型
 func newRemoveClient(client string) *message {
 	return &message{
 		id:          nextid(),
 		messageType: RemoveClient,
 		address:     client,
-		bytes:       []byte(client),
+		bytes:       []byte(client), //clientKey
 	}
 }
 
+// 从reader中decode，返回message
 func newServerMessage(reader io.Reader) (*message, error) {
 	buf := bufio.NewReader(reader)
 
+	//ReadVarint reads an encoded signed integer from r and returns it as an int64.
+	// message.id
 	id, err := binary.ReadVarint(buf)
 	if err != nil {
 		return nil, err
 	}
 
+	// message.connid
 	connID, err := binary.ReadVarint(buf)
 	if err != nil {
 		return nil, err
 	}
 
+	// message.messageType
 	mType, err := binary.ReadVarint(buf)
 	if err != nil {
 		return nil, err
 	}
 
+	// 三个 read int64
 	m := &message{
 		id:          id,
 		messageType: messageType(mType),
@@ -150,6 +169,8 @@ func newServerMessage(reader io.Reader) (*message, error) {
 	}
 
 	if m.messageType == Connect {
+		// 从buf开始读100 Byte
+		// message.bytes
 		bytes, err := ioutil.ReadAll(io.LimitReader(buf, 100))
 		if err != nil {
 			return nil, err
@@ -162,6 +183,7 @@ func newServerMessage(reader io.Reader) (*message, error) {
 		m.address = parts[1]
 		m.bytes = bytes
 	} else if m.messageType == AddClient || m.messageType == RemoveClient {
+		// message.bytes
 		bytes, err := ioutil.ReadAll(io.LimitReader(buf, 100))
 		if err != nil {
 			return nil, err
@@ -173,6 +195,7 @@ func newServerMessage(reader io.Reader) (*message, error) {
 	return m, nil
 }
 
+// 从m.body（raeader）返回error类型
 func (m *message) Err() error {
 	if m.err != nil {
 		return m.err
@@ -192,30 +215,37 @@ func (m *message) Err() error {
 }
 
 func (m *message) Bytes() []byte {
+	// encode m to bytes
 	return append(m.header(len(m.bytes)), m.bytes...)
 }
 
 func (m *message) header(space int) []byte {
+	// 24=3*8（三个int64) space为数据部分（m.bytes
 	buf := make([]byte, 24+space)
 	offset := 0
+	//PutVarint encodes an int64 into buf and returns the number of bytes written.
 	offset += binary.PutVarint(buf[offset:], m.id)
 	offset += binary.PutVarint(buf[offset:], m.connID)
 	offset += binary.PutVarint(buf[offset:], int64(m.messageType))
 	if m.messageType == Data || m.messageType == Connect {
+		// 15s
 		offset += binary.PutVarint(buf[offset:], legacyDeadline)
 	}
 	return buf[:offset]
 }
 
 func (m *message) Read(p []byte) (int, error) {
+	//Read reads up to len(p) bytes into p. It returns the number of bytes
 	return m.body.Read(p)
 }
 
 func (m *message) WriteTo(deadline time.Time, wsConn *wsConn) (int, error) {
+	// 将m(encode to bytes)写到websocket中，类型为BinaryMessage
 	err := wsConn.WriteMessage(websocket.BinaryMessage, deadline, m.Bytes())
 	return len(m.bytes), err
 }
 
+// 不同type的message toString
 func (m *message) String() string {
 	switch m.messageType {
 	case Data:

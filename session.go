@@ -27,10 +27,12 @@ type Session struct {
 	conns            map[int64]*connection
 	remoteClientKeys map[string]map[int]bool
 	auth             ConnectAuthorizer
-	pingCancel       context.CancelFunc
-	pingWait         sync.WaitGroup
-	dialer           Dialer
-	client           bool
+
+	pingCancel context.CancelFunc
+	pingWait   sync.WaitGroup
+
+	dialer Dialer
+	client bool
 }
 
 // PrintTunnelData No tunnel logging by default
@@ -71,9 +73,12 @@ func newSession(sessionKey int64, clientKey string, conn *websocket.Conn) *Sessi
 func (s *Session) startPings(rootCtx context.Context) {
 	ctx, cancel := context.WithCancel(rootCtx)
 	s.pingCancel = cancel
+	// 同步
 	s.pingWait.Add(1)
 
+	// 起一个goroutine，5s websocket ping一次
 	go func() {
+		// 同步close ping 函数
 		defer s.pingWait.Done()
 
 		t := time.NewTicker(PingWriteInterval)
@@ -85,6 +90,7 @@ func (s *Session) startPings(rootCtx context.Context) {
 				return
 			case <-t.C:
 				s.conn.Lock()
+				// ping
 				if err := s.conn.conn.WriteControl(websocket.PingMessage, []byte(""), time.Now().Add(PingWaitDuration)); err != nil {
 					logrus.WithError(err).Error("Error writing ping")
 				}
@@ -101,20 +107,25 @@ func (s *Session) stopPings() {
 	}
 
 	s.pingCancel()
+	// 同步ping 协程优雅退出
 	s.pingWait.Wait()
 }
 
 func (s *Session) Serve(ctx context.Context) (int, error) {
+	// client start ping server
 	if s.client {
 		s.startPings(ctx)
 	}
 
+	// 持续serve
 	for {
+		// mytype = TextMessage or BinaryMessage
 		msType, reader, err := s.conn.NextReader()
 		if err != nil {
 			return 400, err
 		}
 
+		//TextMessage
 		if msType != websocket.BinaryMessage {
 			return 400, errWrongMessageType
 		}
@@ -126,6 +137,8 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 }
 
 func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
+
+	// 解码 得到message
 	message, err := newServerMessage(reader)
 	if err != nil {
 		return err
@@ -136,6 +149,7 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 	}
 
 	if message.messageType == Connect {
+		// 认证
 		if s.auth == nil || !s.auth(message.proto, message.address) {
 			return errors.New("connect not allowed")
 		}
@@ -193,17 +207,20 @@ func parseAddress(address string) (string, int, error) {
 	return parts[0], v, err
 }
 
+// 添加  clientKey - sessionKey - true
 func (s *Session) addRemoteClient(address string) error {
 	clientKey, sessionKey, err := parseAddress(address)
 	if err != nil {
 		return fmt.Errorf("invalid remote Session %s: %v", address, err)
 	}
 
+	// clientKey不存在则创建  clientKey - map[int]bool{}
 	keys := s.remoteClientKeys[clientKey]
 	if keys == nil {
 		keys = map[int]bool{}
 		s.remoteClientKeys[clientKey] = keys
 	}
+	// clientKey - sessionKey - true
 	keys[sessionKey] = true
 
 	if PrintTunnelData {
@@ -213,6 +230,7 @@ func (s *Session) addRemoteClient(address string) error {
 	return nil
 }
 
+// 删除  clientKey - sessionKey - true
 func (s *Session) removeRemoteClient(address string) error {
 	clientKey, sessionKey, err := parseAddress(address)
 	if err != nil {
