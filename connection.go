@@ -63,6 +63,9 @@ func (c *connection) OnData(m *message) error {
 	return c.buffer.Offer(m.body)
 }
 
+/*
+以下五个方法实现了net.Conn接口
+*/
 func (c *connection) Close() error {
 	c.session.closeConnection(c.connID, io.EOF)
 	c.backPressure.Close()
@@ -86,6 +89,14 @@ func (c *connection) Write(b []byte) (int, error) {
 	msg := newMessage(c.connID, b)
 	metrics.AddSMTotalTransmitBytesOnWS(c.session.clientKey, float64(len(msg.Bytes())))
 	return c.session.writeMessage(c.writeDeadline, msg)
+}
+
+func (c *connection) LocalAddr() net.Addr {
+	return c.addr
+}
+
+func (c *connection) RemoteAddr() net.Addr {
+	return c.addr
 }
 
 func (c *connection) OnPause() {
@@ -114,14 +125,9 @@ func (c *connection) writeErr(err error) {
 	}
 }
 
-func (c *connection) LocalAddr() net.Addr {
-	return c.addr
-}
-
-func (c *connection) RemoteAddr() net.Addr {
-	return c.addr
-}
-
+/*
+设置read/write timeout
+*/
 func (c *connection) SetDeadline(t time.Time) error {
 	if err := c.SetReadDeadline(t); err != nil {
 		return err

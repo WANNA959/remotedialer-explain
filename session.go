@@ -39,6 +39,7 @@ type Session struct {
 var PrintTunnelData bool
 
 func init() {
+	//PrintTunnelData = true
 	if os.Getenv("CATTLE_TUNNEL_DATA_DEBUG") == "true" {
 		PrintTunnelData = true
 	}
@@ -48,6 +49,7 @@ func NewClientSession(auth ConnectAuthorizer, conn *websocket.Conn) *Session {
 	return NewClientSessionWithDialer(auth, conn, nil)
 }
 
+// 两种new session
 func NewClientSessionWithDialer(auth ConnectAuthorizer, conn *websocket.Conn, dialer Dialer) *Session {
 	return &Session{
 		clientKey: "client",
@@ -70,6 +72,7 @@ func newSession(sessionKey int64, clientKey string, conn *websocket.Conn) *Sessi
 	}
 }
 
+// 起一个协程 ping/5s
 func (s *Session) startPings(rootCtx context.Context) {
 	ctx, cancel := context.WithCancel(rootCtx)
 	s.pingCancel = cancel
@@ -120,7 +123,9 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 	// 持续serve
 	for {
 		// mytype = TextMessage or BinaryMessage
+		fmt.Println("serve")
 		msType, reader, err := s.conn.NextReader()
+		fmt.Println(msType)
 		if err != nil {
 			return 400, err
 		}
@@ -138,7 +143,7 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 
 func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 
-	// 解码 得到message
+	// 解码 得到request message
 	message, err := newServerMessage(reader)
 	if err != nil {
 		return err
@@ -178,6 +183,7 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 		return nil
 	}
 
+	// conn!=nil
 	switch message.messageType {
 	case Data:
 		if err := conn.OnData(message); err != nil {
@@ -198,6 +204,7 @@ func defaultDeadline() time.Time {
 	return time.Now().Add(time.Minute)
 }
 
+// parse Address to clientKey, sessionKey
 func parseAddress(address string) (string, int, error) {
 	parts := strings.SplitN(address, "/", 2)
 	if len(parts) != 2 {
@@ -207,7 +214,7 @@ func parseAddress(address string) (string, int, error) {
 	return parts[0], v, err
 }
 
-// 添加  clientKey - sessionKey - true
+// 添加 clientKey - sessionKey - true
 func (s *Session) addRemoteClient(address string) error {
 	clientKey, sessionKey, err := parseAddress(address)
 	if err != nil {
@@ -250,6 +257,7 @@ func (s *Session) removeRemoteClient(address string) error {
 	return nil
 }
 
+// 从conns删除一个conn
 func (s *Session) closeConnection(connID int64, err error) {
 	s.Lock()
 	conn := s.conns[connID]
@@ -264,6 +272,7 @@ func (s *Session) closeConnection(connID int64, err error) {
 	}
 }
 
+// client端:增加一个conn到conns
 func (s *Session) clientConnect(ctx context.Context, message *message) {
 	conn := newConnection(message.connID, s, message.proto, message.address)
 
@@ -274,6 +283,7 @@ func (s *Session) clientConnect(ctx context.Context, message *message) {
 	}
 	s.Unlock()
 
+	fmt.Println("client dial here")
 	go clientDial(ctx, s.dialer, conn, message)
 }
 
@@ -286,28 +296,36 @@ func (s *Session) Dial(ctx context.Context, proto, address string) (net.Conn, er
 	return s.serverConnectContext(ctx, proto, address)
 }
 
+// server端:增加一个conn到conns
 func (s *Session) serverConnectContext(ctx context.Context, proto, address string) (net.Conn, error) {
+	// Deadline returns the time when work done on behalf of this context should be canceled.
+	// ok=false代表no deadline is set
 	deadline, ok := ctx.Deadline()
 	if ok {
+		// 设置了deadline
 		return s.serverConnect(deadline, proto, address)
 	}
 
 	result := make(chan connResult, 1)
+	// 没有设置deadline，用default deadline
 	go func() {
 		c, err := s.serverConnect(defaultDeadline(), proto, address)
 		result <- connResult{conn: c, err: err}
 	}()
 
 	select {
+	// timeout
 	case <-ctx.Done():
 		// We don't want to orphan an open connection so we wait for the result and immediately close it
 		go func() {
+			// timeout，但是为了new connection可管理（不是orphan），等待结果并立马close
 			r := <-result
 			if r.err == nil {
 				r.conn.Close()
 			}
 		}()
 		return nil, ctx.Err()
+	// 得到connResult
 	case r := <-result:
 		return r.conn, r.err
 	}
@@ -324,6 +342,7 @@ func (s *Session) serverConnect(deadline time.Time, proto, address string) (net.
 	}
 	s.Unlock()
 
+	// Connect类型的message
 	_, err := s.writeMessage(deadline, newConnect(connID, proto, address))
 	if err != nil {
 		s.closeConnection(connID, err)
@@ -333,6 +352,7 @@ func (s *Session) serverConnect(deadline time.Time, proto, address string) (net.
 	return conn, err
 }
 
+// 写到websocket conn中
 func (s *Session) writeMessage(deadline time.Time, message *message) (int, error) {
 	if PrintTunnelData {
 		logrus.Debug("WRITE ", message)
@@ -340,6 +360,7 @@ func (s *Session) writeMessage(deadline time.Time, message *message) (int, error
 	return message.WriteTo(deadline, s.conn)
 }
 
+//关闭一个session：stopping+close conns tunnel并清空conns
 func (s *Session) Close() {
 	s.Lock()
 	defer s.Unlock()
@@ -353,6 +374,11 @@ func (s *Session) Close() {
 	s.conns = map[int64]*connection{}
 }
 
+/*
+实现了 session_maneger sessionListener interface
+
+有err close websocket conn
+*/
 func (s *Session) sessionAdded(clientKey string, sessionKey int64) {
 	client := fmt.Sprintf("%s/%d", clientKey, sessionKey)
 	_, err := s.writeMessage(time.Time{}, newAddClient(client))

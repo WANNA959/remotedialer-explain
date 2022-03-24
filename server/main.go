@@ -33,9 +33,12 @@ func Client(server *remotedialer.Server, rw http.ResponseWriter, req *http.Reque
 		timeout = "15"
 	}
 
+	// 解析参数为map形式 /client/{id}/{scheme}/{host}{path:.*}
 	vars := mux.Vars(req)
 	clientKey := vars["id"]
 	url := fmt.Sprintf("%s://%s%s", vars["scheme"], vars["host"], vars["path"])
+
+	// get/set client
 	client := getClient(server, clientKey, timeout)
 
 	id := atomic.AddInt64(&counter, 1)
@@ -55,16 +58,22 @@ func Client(server *remotedialer.Server, rw http.ResponseWriter, req *http.Reque
 	logrus.Infof("[%03d] REQ DONE t=%s %s", id, timeout, url)
 }
 
+/*
+get / set方法
+根据clientkey找到对应的client  *http.Client{}
+不存在，则创建client，使得server可以作为client通信
+*/
 func getClient(server *remotedialer.Server, clientKey, timeout string) *http.Client {
 	l.Lock()
 	defer l.Unlock()
 
 	key := fmt.Sprintf("%s/%s", clientKey, timeout)
 	client := clients[key]
+	// 存在 直接返回
 	if client != nil {
 		return client
 	}
-
+	// 不存在，根据clientkey build
 	dialer := server.Dialer(clientKey)
 	client = &http.Client{
 		Transport: &http.Transport{
@@ -78,6 +87,7 @@ func getClient(server *remotedialer.Server, clientKey, timeout string) *http.Cli
 		}
 	}
 
+	//set client
 	clients[key] = client
 	return client
 }
@@ -107,6 +117,7 @@ func main() {
 	handler.PeerID = peerID
 
 	for _, peer := range strings.Split(peers, ",") {
+		// id token url
 		parts := strings.SplitN(strings.TrimSpace(peer), ":", 3)
 		if len(parts) != 3 {
 			continue
@@ -116,7 +127,9 @@ func main() {
 
 	router := mux.NewRouter()
 	router.Handle("/connect", handler)
+	// 四个参数
 	router.HandleFunc("/client/{id}/{scheme}/{host}{path:.*}", func(rw http.ResponseWriter, req *http.Request) {
+		fmt.Println(req.URL.Path)
 		Client(handler, rw, req)
 	})
 

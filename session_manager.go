@@ -31,6 +31,7 @@ func newSessionManager() *sessionManager {
 	}
 }
 
+// 根据不同的protocol构建 proto + address string 并构建server netConn(session
 func toDialer(s *Session, prefix string) Dialer {
 	return func(ctx context.Context, proto, address string) (net.Conn, error) {
 		if prefix == "" {
@@ -40,6 +41,7 @@ func toDialer(s *Session, prefix string) Dialer {
 	}
 }
 
+// 删除一个session
 func (sm *sessionManager) removeListener(listener sessionListener) {
 	sm.Lock()
 	defer sm.Unlock()
@@ -47,12 +49,14 @@ func (sm *sessionManager) removeListener(listener sessionListener) {
 	delete(sm.listeners, listener)
 }
 
+// 添加一个session
 func (sm *sessionManager) addListener(listener sessionListener) {
 	sm.Lock()
 	defer sm.Unlock()
 
 	sm.listeners[listener] = true
 
+	// 把client和peer的所有 clientkey-sessionkey 添加newAddClient message
 	for k, sessions := range sm.clients {
 		for _, session := range sessions {
 			listener.sessionAdded(k, session.sessionKey)
@@ -66,15 +70,19 @@ func (sm *sessionManager) addListener(listener sessionListener) {
 	}
 }
 
+// find session for a client
 func (sm *sessionManager) getDialer(clientKey string) (Dialer, error) {
 	sm.Lock()
 	defer sm.Unlock()
 
+	// todo LoadBalance?
+	// 找到clientkey对应的session 直接return toDialer(sessions[0], "") 第一个session
 	sessions := sm.clients[clientKey]
 	if len(sessions) > 0 {
 		return toDialer(sessions[0], ""), nil
 	}
 
+	// 从peers中找
 	for _, sessions := range sm.peers {
 		for _, session := range sessions {
 			session.Lock()
@@ -89,6 +97,7 @@ func (sm *sessionManager) getDialer(clientKey string) (Dialer, error) {
 	return nil, fmt.Errorf("failed to find Session for client %s", clientKey)
 }
 
+// add websocket session
 func (sm *sessionManager) add(clientKey string, conn *websocket.Conn, peer bool) *Session {
 	sessionKey := rand.Int63()
 	session := newSession(sessionKey, clientKey, conn)
@@ -96,9 +105,11 @@ func (sm *sessionManager) add(clientKey string, conn *websocket.Conn, peer bool)
 	sm.Lock()
 	defer sm.Unlock()
 
+	// 是peer 则添加到sm.peers[clientKey]
 	if peer {
 		sm.peers[clientKey] = append(sm.peers[clientKey], session)
 	} else {
+		// 是client 则添加到sm.clients[clientKey]
 		sm.clients[clientKey] = append(sm.clients[clientKey], session)
 	}
 	metrics.IncSMTotalAddWS(clientKey, peer)

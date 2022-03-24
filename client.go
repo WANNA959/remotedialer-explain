@@ -32,6 +32,7 @@ func ConnectToProxy(rootCtx context.Context, proxyURL string, headers http.Heade
 		dialer = &websocket.Dialer{Proxy: http.ProxyFromEnvironment, HandshakeTimeout: HandshakeTimeOut}
 	}
 	ws, resp, err := dialer.DialContext(rootCtx, proxyURL, headers)
+	// err log
 	if err != nil {
 		if resp == nil {
 			logrus.WithError(err).Errorf("Failed to connect to proxy. Empty dialer response")
@@ -63,6 +64,7 @@ func ConnectToProxy(rootCtx context.Context, proxyURL string, headers http.Heade
 		}()
 	}
 
+	// 持续serve，直到有err
 	go func() {
 		_, err = session.Serve(ctx)
 		result <- err

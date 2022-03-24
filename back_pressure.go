@@ -21,6 +21,10 @@ func newBackPressure(c *connection) *backPressure {
 	}
 }
 
+/*
+对应message的各种type
+*/
+// pause类型
 func (b *backPressure) OnPause() {
 	b.cond.L.Lock()
 	defer b.cond.L.Unlock()
@@ -29,6 +33,7 @@ func (b *backPressure) OnPause() {
 	b.cond.Broadcast()
 }
 
+// close类型
 func (b *backPressure) Close() {
 	b.cond.L.Lock()
 	defer b.cond.L.Unlock()
@@ -37,6 +42,7 @@ func (b *backPressure) Close() {
 	b.cond.Broadcast()
 }
 
+// resume类型
 func (b *backPressure) OnResume() {
 	b.cond.L.Lock()
 	defer b.cond.L.Unlock()

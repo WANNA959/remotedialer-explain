@@ -29,5 +29,6 @@ func main() {
 		"X-Tunnel-ID": []string{id},
 	}
 
-	remotedialer.ClientConnect(context.Background(), addr, headers, nil, func(string, string) bool { return true }, nil)
+	ctx := context.Background()
+	remotedialer.ClientConnect(ctx, addr, headers, nil, func(string, string) bool { return true }, nil)
 }

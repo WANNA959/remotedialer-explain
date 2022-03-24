@@ -13,6 +13,8 @@ See also:
 
 * [inlets.dev](https://inlets.dev) which uses the client and server components to form a tunnel for clients behind NAT or firewalls.
 
+# Usage Demo
+
 
 
 # 源码分析
@@ -123,15 +125,101 @@ func newRemoveClient(client string) *message {
 - NextReader
   - NextReader returns the next data message received from the peer.
 
-## session & session_manager
+## session
 
-- session管理
-  - clientKey-sessionKey
-    - removeRemoteClient
-    - addRemoteClient
-  - connections
-    - closeConnection
-    - clientConnect
+- 管理
+  - 一个websocket conn
+  - 若干个connection
+    - message.connID-connection
+      - 关闭：closeConnection
+        - conn.tunnelClose(err)
+      - client开启：clientConnect
+        - go clientDial(ctx, s.dialer, conn, message)
+      - server开启：serverConnectContext
+        - serverConnect
+  - 若干个clientkey
+    - clientkey - sessionkey- true
+      - removeRemoteClient
+      - addRemoteClient
+  - 实现sessionListener接口
+    - sessionAdded
+    - sessionRemoved
+
+```go
+type Session struct {
+	sync.Mutex
+
+	nextConnID       int64
+	clientKey        string
+	sessionKey       int64
+  
+	conn             *wsConn
+	conns            map[int64]*connection
+	remoteClientKeys map[string]map[int]bool
+	auth             ConnectAuthorizer
+
+	pingCancel context.CancelFunc
+	pingWait   sync.WaitGroup
+
+	dialer Dialer
+	client bool
+}
+```
+
+- 两种new connection instance
+  - NewClientSessionWithDialer
+  - newSession
+
+- ping相关
+  - start
+  - stop
+- 持续监听服务serve
+  - serveMessage：decode reader得到message参数，根据不同的参数做对应的操作
+
+## session_manager
+
+- 管理
+  - clients
+    - 一个client对应多个session
+  - peers
+    - 一个peer对应多个session
+  - listeners sessionListener-bool
+    - removeListener
+    - addListener
+
+```go
+type sessionManager struct {
+	sync.Mutex
+	clients   map[string][]*Session
+	peers     map[string][]*Session
+	listeners map[sessionListener]bool
+}
+```
+
+
 
 ## connection
 
+- 封装了一个session
+
+```go
+type connection struct {
+	err           error
+	writeDeadline time.Time
+	backPressure  *backPressure
+	buffer        *readBuffer
+	addr          addr
+	session       *Session
+	connID        int64
+}
+```
+
+
+
+### Read_buffer
+
+### back_pressure
+
+- 封装一个connection
+  - sync.Cond
+  - pause+closed标志

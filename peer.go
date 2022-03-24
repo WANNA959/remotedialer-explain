@@ -57,6 +57,7 @@ func (s *Server) AddPeer(url, id, token string) {
 	go peer.start(ctx, s)
 }
 
+//
 func (s *Server) RemovePeer(id string) {
 	s.peerLock.Lock()
 	defer s.peerLock.Unlock()
