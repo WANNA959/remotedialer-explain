@@ -126,7 +126,7 @@ go run ./client/main.go -id wanna2 -connect ws://localhost:8125/connect
 >
 > 原理：server会从本server+peers server中找wanna这个client key（对应session），故无论对peer0还是peer1请求，都能找到session，剩下的是代理转发工作（是不是peers关系都可）
 
-![image-20220324194941796](/Users/zhujianxing/GoLandProjects/remotedialer/images/image-20220324194941796.png)
+![image-20220324194941796](https://tva1.sinaimg.cn/large/e6c9d24ely1h0lf3hif3dj219q0ig42j.jpg)
 
 > 向peer0、peer1请求server3（向server3请求peer0、peer1）（wanna1已经connect localhost:8123）
 >
@@ -136,9 +136,9 @@ go run ./client/main.go -id wanna2 -connect ws://localhost:8125/connect
 >
 > 原理：同上
 
-![image-20220324200205290](/Users/zhujianxing/GoLandProjects/remotedialer/images/image-20220324200205290.png)
+![image-20220324200205290](https://tva1.sinaimg.cn/large/e6c9d24ely1h0lf3ifvegj219i0iogpx.jpg)
 
-![image-20220324200716965](/Users/zhujianxing/GoLandProjects/remotedialer/images/image-20220324200716965.png)
+![image-20220324200716965](https://tva1.sinaimg.cn/large/e6c9d24ely1h0lf3kdhkmj219y0a0q4u.jpg)
 
 > 结论
 
