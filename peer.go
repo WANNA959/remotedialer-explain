@@ -105,7 +105,7 @@ outer:
 		default:
 		}
 
-		// 尝试和websocket建立连接
+		// 本server尝试和其他server websocket建立连接
 		metrics.IncSMTotalAddPeerAttempt(p.id)
 		ws, _, err := dialer.Dial(p.url, headers)
 		// 每5s尝试handshake

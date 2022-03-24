@@ -31,7 +31,11 @@ See also:
 | -id      | clientId（clientKey         |
 | -debug   | debug log or not            |
 
-
+- 发送connect请求，注册一个client id—session
+- header中包含client id
+- remotedialer.ClientConnect(ctx, addr, headers, nil, func(string, string) bool { return true }, nil)——ConnectToProxy
+  - ws, resp, err := dialer.DialContext(rootCtx, proxyURL, headers)
+  - 新建一个session：session := NewClientSession(auth, ws)
 
 > Server
 
@@ -54,6 +58,11 @@ See also:
     - 构建向peer请求的client（试图连接其他rancher server
       - header中包含peer的id和token
       - 每5s请求一次
+    - 根据ws创建一个session
+    - s.sessions.addListener(session)
+      - sm.listeners[listener] = true
+      - 遍历sm.peers+sm.client，添加newAddClient message
+        - 接收newAddClient message处理：addRemoteClient
 
 - handler
   - /connect
@@ -81,9 +90,7 @@ See also:
   - /client/{id}/healthz：自定义handleFunc
     - response：resStr := fmt.Sprintf("addrss:%s receive name=%s from client:%s\n", addr, name, id)
 
-
-
-## HTTP下
+## HTTP下使用
 
 > server
 
