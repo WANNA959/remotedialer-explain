@@ -18,8 +18,9 @@ type sessionListener interface {
 
 type sessionManager struct {
 	sync.Mutex
-	clients   map[string][]*Session
-	peers     map[string][]*Session
+	clients map[string][]*Session
+	peers   map[string][]*Session
+	// 表示client+peers 的所有session
 	listeners map[sessionListener]bool
 }
 
@@ -56,6 +57,7 @@ func (sm *sessionManager) addListener(listener sessionListener) {
 
 	sm.listeners[listener] = true
 
+	// 同步client+peers clientKey
 	// 把client和peer的所有 clientkey-sessionkey 添加newAddClient message
 	for k, sessions := range sm.clients {
 		for _, session := range sessions {
@@ -105,15 +107,16 @@ func (sm *sessionManager) add(clientKey string, conn *websocket.Conn, peer bool)
 	sm.Lock()
 	defer sm.Unlock()
 
-	// 是peer 则添加到sm.peers[clientKey]
+	// 是peer认证通过的 则添加到sm.peers[clientKey]
 	if peer {
 		sm.peers[clientKey] = append(sm.peers[clientKey], session)
 	} else {
-		// 是client 则添加到sm.clients[clientKey]
+		// 是server本身认证通过的， 则添加到sm.clients[clientKey]
 		sm.clients[clientKey] = append(sm.clients[clientKey], session)
 	}
 	metrics.IncSMTotalAddWS(clientKey, peer)
 
+	// l为session
 	for l := range sm.listeners {
 		l.sessionAdded(clientKey, session.sessionKey)
 	}

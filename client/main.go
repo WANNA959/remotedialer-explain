@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/rancher/remotedialer/common"
 	"net/http"
 
 	"github.com/rancher/remotedialer"
@@ -26,9 +27,10 @@ func main() {
 	}
 
 	headers := http.Header{
-		"X-Tunnel-ID": []string{id},
+		common.TUNNELID: []string{id},
 	}
 
 	ctx := context.Background()
 	remotedialer.ClientConnect(ctx, addr, headers, nil, func(string, string) bool { return true }, nil)
+
 }

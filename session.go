@@ -125,7 +125,9 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 		// mytype = TextMessage or BinaryMessage
 		fmt.Println("serve")
 		msType, reader, err := s.conn.NextReader()
-		fmt.Println(msType)
+		//TextMessage = 1 BinaryMessage = 2
+		fmt.Printf("msType=%d\n", msType)
+		//fmt.Println(msType)
 		if err != nil {
 			return 400, err
 		}
@@ -145,6 +147,7 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 
 	// 解码 得到request message
 	message, err := newServerMessage(reader)
+	fmt.Printf("message:%+v\n", message)
 	if err != nil {
 		return err
 	}

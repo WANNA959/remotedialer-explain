@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/rancher/remotedialer/common"
 	"io"
 	"net/http"
 	"strconv"
@@ -22,13 +23,17 @@ var (
 	counter int64
 )
 
+// 自定义 认证方案
 func authorizer(req *http.Request) (string, bool, error) {
-	id := req.Header.Get("x-tunnel-id")
+	id := req.Header.Get(common.TUNNELID)
+	// id!=""即pass【
 	return id, id != "", nil
 }
 
 func Client(server *remotedialer.Server, rw http.ResponseWriter, req *http.Request) {
 	timeout := req.URL.Query().Get("timeout")
+	name := req.URL.Query().Get("name")
+	fmt.Printf("name=%s", name)
 	if timeout == "" {
 		timeout = "15"
 	}
@@ -37,6 +42,7 @@ func Client(server *remotedialer.Server, rw http.ResponseWriter, req *http.Reque
 	vars := mux.Vars(req)
 	clientKey := vars["id"]
 	url := fmt.Sprintf("%s://%s%s", vars["scheme"], vars["host"], vars["path"])
+	fmt.Printf("request url = %s\n", url)
 
 	// get/set client
 	client := getClient(server, clientKey, timeout)
@@ -73,7 +79,7 @@ func getClient(server *remotedialer.Server, clientKey, timeout string) *http.Cli
 	if client != nil {
 		return client
 	}
-	// 不存在，根据clientkey build
+	// 不存在，根据clientkey build(前提是有这个clientkey对应的session
 	dialer := server.Dialer(clientKey)
 	client = &http.Client{
 		Transport: &http.Transport{
@@ -112,6 +118,7 @@ func main() {
 		remotedialer.PrintTunnelData = true
 	}
 
+	// 实例化一个server（实现了handler接口
 	handler := remotedialer.New(authorizer, remotedialer.DefaultErrorWriter)
 	handler.PeerToken = peerToken
 	handler.PeerID = peerID
@@ -119,6 +126,7 @@ func main() {
 	for _, peer := range strings.Split(peers, ",") {
 		// id token url
 		parts := strings.SplitN(strings.TrimSpace(peer), ":", 3)
+		fmt.Printf("peer parts:%+v\n", parts)
 		if len(parts) != 3 {
 			continue
 		}
@@ -126,13 +134,37 @@ func main() {
 	}
 
 	router := mux.NewRouter()
+	// 处理连接请求 如demo中client / main
 	router.Handle("/connect", handler)
-	// 四个参数
+
+	// 代理转发，四个参数
 	router.HandleFunc("/client/{id}/{scheme}/{host}{path:.*}", func(rw http.ResponseWriter, req *http.Request) {
 		fmt.Println(req.URL.Path)
 		Client(handler, rw, req)
 	})
 
+	//自定义一个handlefunc
+	router.HandleFunc("/client/{id}/healthz", func(writer http.ResponseWriter, request *http.Request) {
+		name := request.URL.Query().Get("name")
+		vars := mux.Vars(request)
+		id := vars["id"]
+		resStr := fmt.Sprintf("addrss:%s receive name=%s from client:%s\n", addr, name, id)
+		fmt.Printf(resStr)
+		writer.Write([]byte(resStr))
+	})
+
+	//自定义一个handlefunc
+	router.HandleFunc("/client/healthz", func(writer http.ResponseWriter, request *http.Request) {
+		name := request.URL.Query().Get("name")
+		resStr := fmt.Sprintf("addrss:%s receive name=%s\n", addr, name)
+		fmt.Printf(resStr)
+		writer.Write([]byte(resStr))
+	})
+
+	err := http.ListenAndServe(addr, router)
+	if err != nil {
+		fmt.Printf("ListenAndServe err:%+v", err)
+		return
+	}
 	fmt.Println("Listening on ", addr)
-	http.ListenAndServe(addr, router)
 }

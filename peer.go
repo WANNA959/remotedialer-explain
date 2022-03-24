@@ -27,6 +27,7 @@ var (
 不存在，start
 */
 func (s *Server) AddPeer(url, id, token string) {
+	// server有peer要求本身也需要有peer id 和 peer token
 	if s.PeerID == "" || s.PeerToken == "" {
 		return
 	}
@@ -39,6 +40,7 @@ func (s *Server) AddPeer(url, id, token string) {
 		cancel: cancel,
 	}
 
+	fmt.Println("here")
 	logrus.Infof("Adding peer %s, %s", url, id)
 
 	s.peerLock.Lock()
@@ -106,6 +108,7 @@ outer:
 		// 尝试和websocket建立连接
 		metrics.IncSMTotalAddPeerAttempt(p.id)
 		ws, _, err := dialer.Dial(p.url, headers)
+		// 每5s尝试handshake
 		if err != nil {
 			logrus.Errorf("Failed to connect to peer %s [local ID=%s]: %v", p.url, s.PeerID, err)
 			time.Sleep(5 * time.Second)
@@ -118,6 +121,7 @@ outer:
 		session := NewClientSession(func(string, string) bool { return true }, ws)
 		session.dialer = func(ctx context.Context, network, address string) (net.Conn, error) {
 			parts := strings.SplitN(network, "::", 2)
+			fmt.Printf("parts=%s\n", parts)
 			if len(parts) != 2 {
 				return nil, fmt.Errorf("invalid clientKey/proto: %s", network)
 			}
@@ -126,7 +130,9 @@ outer:
 		}
 
 		s.sessions.addListener(session)
+		// 阻塞 serve here
 		_, err = session.Serve(ctx)
+
 		s.sessions.removeListener(session)
 		session.Close()
 

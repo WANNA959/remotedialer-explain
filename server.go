@@ -43,8 +43,11 @@ func New(auth Authorizer, errorWriter ErrorWriter) *Server {
 	}
 }
 
+// 实现handler接口
 func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	clientKey, authed, peer, err := s.auth(req)
+
+	// 认证
 	if err != nil {
 		s.errorWriter(rw, req, 400, err)
 		return
@@ -53,9 +56,11 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 		s.errorWriter(rw, req, 401, errFailedAuth)
 		return
 	}
-
+	// 认证成功
 	logrus.Infof("Handling backend connection request [%s]", clientKey)
 
+	// http to websocket
+	//Upgrader specifies parameters for upgrading an HTTP connection to a WebSocket connection.
 	upgrader := websocket.Upgrader{
 		HandshakeTimeout: 5 * time.Second,
 		CheckOrigin:      func(r *http.Request) bool { return true },
@@ -72,6 +77,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	session.auth = s.ClientConnectAuthorizer
 	defer s.sessions.remove(session)
 
+	// 阻塞 server serve here
 	code, err := session.Serve(req.Context())
 	if err != nil {
 		// Hijacked so we can't write to the client
@@ -79,6 +85,7 @@ func (s *Server) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	}
 }
 
+// peer认证 or 自身认证
 func (s *Server) auth(req *http.Request) (clientKey string, authed, peer bool, err error) {
 	id := req.Header.Get(ID)
 	token := req.Header.Get(Token)
