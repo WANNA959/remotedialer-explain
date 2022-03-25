@@ -225,8 +225,15 @@ go run ./client/main.go -id wanna2 -connect ws://localhost:8125/connect
                 - serverConnect
                   - 创建一个connection
                     - **返回的即该connection**
-                    - 由此可知session中的conns，保存的是对其他client/server的connection（session
-                  - **write connect类型message**
+                    - 由此可知session中的conns，保存的是对其他client/server的主动connection（session
+                  - **本质是write connect类型message**
+                    - 接受者收到connect类型message，调用s.clientConnect(ctx, message)
+                      - 新建一个connection：conn := newConnection(message.connID, s, message.proto, message.address)
+                      - 加入conns
+                      - go clientDial(ctx, s.dialer, conn, message)
+                        - 主动连接：netConn, err = d.DialContext(ctx, message.proto, message.address)
+                        - pipe
+                          - 双工
       - 调用d(ctx, network, address)：d(ctx,"tcp","localhost:8125")
 
     - addListener
