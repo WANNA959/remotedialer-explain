@@ -138,13 +138,14 @@ func main() {
 	router.Handle("/connect", handler)
 
 	// 代理转发，四个参数
-	router.HandleFunc("/client/{id}/{scheme}/{host}{path:.*}", func(rw http.ResponseWriter, req *http.Request) {
-		fmt.Println(req.URL.Path)
-		Client(handler, rw, req)
+	router.HandleFunc("/client/{id}/{scheme}/{host}{path:.*}", func(rw http.ResponseWriter, request *http.Request) {
+		fmt.Printf("handler get request(proto=%+v) path:%+v", request.Proto, request.URL.Path)
+		Client(handler, rw, request)
 	})
 
 	//自定义一个handlefunc
 	router.HandleFunc("/client/{id}/healthz", func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Printf("handler get request(proto=%+v) path:%+v", request.Proto, request.URL.Path)
 		name := request.URL.Query().Get("name")
 		vars := mux.Vars(request)
 		id := vars["id"]
@@ -155,6 +156,7 @@ func main() {
 
 	//自定义一个handlefunc
 	router.HandleFunc("/client/healthz", func(writer http.ResponseWriter, request *http.Request) {
+		fmt.Printf("handler get request(proto=%+v) path:%+v", request.Proto, request.URL.Path)
 		name := request.URL.Query().Get("name")
 		resStr := fmt.Sprintf("addrss:%s receive name=%s\n", addr, name)
 		fmt.Printf(resStr)

@@ -121,7 +121,9 @@ outer:
 		session := NewClientSession(func(string, string) bool { return true }, ws)
 		session.dialer = func(ctx context.Context, network, address string) (net.Conn, error) {
 			parts := strings.SplitN(network, "::", 2)
-			fmt.Printf("parts=%s\n", parts)
+			//network=wanna1::tcp address=localhost:8125 parts=[wanna1 tcp]
+			//network=wanna1::tcp address=localhost:8123 parts=[wanna1 tcp]
+			fmt.Printf("network=%+v address=%+v parts=%s\n", network, address, parts)
 			if len(parts) != 2 {
 				return nil, fmt.Errorf("invalid clientKey/proto: %s", network)
 			}

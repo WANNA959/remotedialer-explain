@@ -39,7 +39,7 @@ type Session struct {
 var PrintTunnelData bool
 
 func init() {
-	//PrintTunnelData = true
+	PrintTunnelData = true
 	if os.Getenv("CATTLE_TUNNEL_DATA_DEBUG") == "true" {
 		PrintTunnelData = true
 	}
@@ -120,7 +120,7 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 		s.startPings(ctx)
 	}
 
-	// 持续serve
+	// 持续serve(读消息
 	for {
 		// mytype = TextMessage or BinaryMessage
 		fmt.Println("serve")
@@ -156,6 +156,11 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 		logrus.Debug("REQUEST ", message)
 	}
 
+	/*
+		根据message type采取不同的操作
+	*/
+
+	// connect类型 认证通过后新建一个connection（session
 	if message.messageType == Connect {
 		// 认证
 		if s.auth == nil || !s.auth(message.proto, message.address) {
@@ -166,11 +171,14 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 	}
 
 	s.Lock()
+
+	// addClient类型 创建一个client：addRemoteClient
 	if message.messageType == AddClient && s.remoteClientKeys != nil {
 		err := s.addRemoteClient(message.address)
 		s.Unlock()
 		return err
 	} else if message.messageType == RemoveClient {
+		// RemoveClient类型 删除一个client：removeRemoteClient
 		err := s.removeRemoteClient(message.address)
 		s.Unlock()
 		return err
@@ -178,6 +186,7 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 	conn := s.conns[message.connID]
 	s.Unlock()
 
+	// 没有connection，收到对应connid的data write error message
 	if conn == nil {
 		if message.messageType == Data {
 			err := fmt.Errorf("connection not found %s/%d/%d", s.clientKey, s.sessionKey, message.connID)
@@ -186,7 +195,7 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 		return nil
 	}
 
-	// conn!=nil
+	// conn!=nil 下面四种类型都需要conn非空，即存在对应connid的connection
 	switch message.messageType {
 	case Data:
 		if err := conn.OnData(message); err != nil {
@@ -295,6 +304,7 @@ type connResult struct {
 	err  error
 }
 
+// dialer
 func (s *Session) Dial(ctx context.Context, proto, address string) (net.Conn, error) {
 	return s.serverConnectContext(ctx, proto, address)
 }

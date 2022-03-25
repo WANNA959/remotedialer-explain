@@ -234,6 +234,7 @@ func (m *message) header(space int) []byte {
 	return buf[:offset]
 }
 
+// 实现reader接口
 func (m *message) Read(p []byte) (int, error) {
 	//Read reads up to len(p) bytes into p. It returns the number of bytes
 	return m.body.Read(p)

@@ -34,6 +34,9 @@ func newConnection(connID int64, session *Session, proto, address string) *conne
 	return c
 }
 
+/*
+当dialer失败，或者连接关闭，处理connection的关闭
+*/
 func (c *connection) tunnelClose(err error) {
 	// 从websocket删除的connection
 	metrics.IncSMTotalRemoveConnectionsForWS(c.session.clientKey, c.addr.Network(), c.addr.String())
@@ -52,15 +55,6 @@ func (c *connection) doTunnelClose(err error) {
 	}
 
 	c.buffer.Close(c.err)
-}
-
-func (c *connection) OnData(m *message) error {
-	if PrintTunnelData {
-		defer func() {
-			logrus.Debugf("ONDATA  [%d] %s", c.connID, c.buffer.Status())
-		}()
-	}
-	return c.buffer.Offer(m.body)
 }
 
 /*
@@ -85,6 +79,8 @@ func (c *connection) Write(b []byte) (int, error) {
 	if c.err != nil {
 		return 0, io.ErrClosedPipe
 	}
+	// 如果connection处于pause状态（未close），则说明buf满了，需要pause等待
+	// 在此阻塞
 	c.backPressure.Wait()
 	msg := newMessage(c.connID, b)
 	metrics.AddSMTotalTransmitBytesOnWS(c.session.clientKey, float64(len(msg.Bytes())))
@@ -99,6 +95,9 @@ func (c *connection) RemoteAddr() net.Addr {
 	return c.addr
 }
 
+/*
+接收pause/resume/data类型message的操作
+*/
 func (c *connection) OnPause() {
 	c.backPressure.OnPause()
 }
@@ -107,6 +106,18 @@ func (c *connection) OnResume() {
 	c.backPressure.OnResume()
 }
 
+func (c *connection) OnData(m *message) error {
+	if PrintTunnelData {
+		defer func() {
+			logrus.Debugf("ONDATA  [%d] %s", c.connID, c.buffer.Status())
+		}()
+	}
+	return c.buffer.Offer(m.body)
+}
+
+/*
+发送pause、resume、Error类型的操作：本质就是write message
+*/
 func (c *connection) Pause() {
 	msg := newPause(c.connID)
 	_, _ = c.session.writeMessage(c.writeDeadline, msg)
@@ -145,6 +156,9 @@ func (c *connection) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
+/*
+addr结构体及get方法
+*/
 type addr struct {
 	proto   string
 	address string

@@ -38,6 +38,7 @@ func toDialer(s *Session, prefix string) Dialer {
 		if prefix == "" {
 			return s.serverConnectContext(ctx, proto, address)
 		}
+		// 对应peer中的session.dialer
 		return s.serverConnectContext(ctx, prefix+"::"+proto, address)
 	}
 }
@@ -110,9 +111,11 @@ func (sm *sessionManager) add(clientKey string, conn *websocket.Conn, peer bool)
 	// 是peer认证通过的 则添加到sm.peers[clientKey]
 	if peer {
 		sm.peers[clientKey] = append(sm.peers[clientKey], session)
+		fmt.Printf("len(peers)=%+v\n", len(sm.peers))
 	} else {
 		// 是server本身认证通过的， 则添加到sm.clients[clientKey]
 		sm.clients[clientKey] = append(sm.clients[clientKey], session)
+		fmt.Printf("len(clients)=%+v\n", len(sm.clients))
 	}
 	metrics.IncSMTotalAddWS(clientKey, peer)
 
@@ -130,10 +133,12 @@ func (sm *sessionManager) remove(s *Session) {
 	defer sm.Unlock()
 
 	for i, store := range []map[string][]*Session{sm.clients, sm.peers} {
+		// 对每个clientKey
 		var newSessions []*Session
-
+		// 某个clientKey下的若干个session
 		for _, v := range store[s.clientKey] {
 			if v.sessionKey == s.sessionKey {
+				// todo 勘误 clients可能不止一个，故不能用i=0判断是clients or peers
 				if i == 0 {
 					isPeer = false
 				} else {
@@ -145,6 +150,7 @@ func (sm *sessionManager) remove(s *Session) {
 			newSessions = append(newSessions, v)
 		}
 
+		// 此处为引用，如可以改变clients or peers
 		if len(newSessions) == 0 {
 			delete(store, s.clientKey)
 		} else {

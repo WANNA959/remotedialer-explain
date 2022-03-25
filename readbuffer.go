@@ -12,16 +12,19 @@ import (
 )
 
 const (
+	// 2MB
 	MaxBuffer = 1 << 21
 )
 
 type readBuffer struct {
 	id, readCount, offerCount int64
 	cond                      sync.Cond
-	deadline                  time.Time
-	buf                       bytes.Buffer
-	err                       error
-	backPressure              *backPressure
+	// read deadline，在connection中SetReadDeadline
+	deadline time.Time
+	// read buffer
+	buf          bytes.Buffer
+	err          error
+	backPressure *backPressure
 }
 
 func newReadBuffer(id int64, backPressure *backPressure) *readBuffer {
@@ -34,12 +37,14 @@ func newReadBuffer(id int64, backPressure *backPressure) *readBuffer {
 	}
 }
 
+// 用来log
 func (r *readBuffer) Status() string {
 	r.cond.L.Lock()
 	defer r.cond.L.Unlock()
 	return fmt.Sprintf("%d/%d", r.readCount, r.offerCount)
 }
 
+// reader内容写入到buf
 func (r *readBuffer) Offer(reader io.Reader) error {
 	r.cond.L.Lock()
 	defer r.cond.L.Unlock()
@@ -48,6 +53,7 @@ func (r *readBuffer) Offer(reader io.Reader) error {
 		return r.err
 	}
 
+	// reader写到buf，offset记录buf的offset
 	if n, err := io.Copy(&r.buf, reader); err != nil {
 		r.offerCount += n
 		return err
@@ -56,6 +62,7 @@ func (r *readBuffer) Offer(reader io.Reader) error {
 		r.cond.Broadcast()
 	}
 
+	// buf过大 write pause type message
 	if r.buf.Len() > MaxBuffer {
 		r.backPressure.Pause()
 	}
@@ -67,6 +74,7 @@ func (r *readBuffer) Offer(reader io.Reader) error {
 	return nil
 }
 
+//
 func (r *readBuffer) Read(b []byte) (int, error) {
 	r.cond.L.Lock()
 	defer r.cond.L.Unlock()
@@ -108,6 +116,8 @@ func (r *readBuffer) Read(b []byte) (int, error) {
 		if !r.deadline.IsZero() {
 			t = time.AfterFunc(r.deadline.Sub(now), func() { r.cond.Broadcast() })
 		}
+
+		// 阻塞
 		r.cond.Wait()
 		if t != nil {
 			t.Stop()

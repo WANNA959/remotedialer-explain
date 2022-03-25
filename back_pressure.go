@@ -24,7 +24,7 @@ func newBackPressure(c *connection) *backPressure {
 /*
 对应message的各种type
 */
-// pause类型
+// on pause类型：表示收到pause 类型message的操作
 func (b *backPressure) OnPause() {
 	b.cond.L.Lock()
 	defer b.cond.L.Unlock()
@@ -42,7 +42,7 @@ func (b *backPressure) Close() {
 	b.cond.Broadcast()
 }
 
-// resume类型
+// on resume类型：表示收到resume 类型message的操作
 func (b *backPressure) OnResume() {
 	b.cond.L.Lock()
 	defer b.cond.L.Unlock()
@@ -51,9 +51,11 @@ func (b *backPressure) OnResume() {
 	b.cond.Broadcast()
 }
 
+// 发送pause 类型message的操作
 func (b *backPressure) Pause() {
 	b.cond.L.Lock()
 	defer b.cond.L.Unlock()
+	// 已经发送过pause了
 	if b.paused {
 		return
 	}
@@ -61,9 +63,11 @@ func (b *backPressure) Pause() {
 	b.paused = true
 }
 
+// 发送resume 类型message的操作
 func (b *backPressure) Resume() {
 	b.cond.L.Lock()
 	defer b.cond.L.Unlock()
+	// 已经发送过resume类型了
 	if !b.paused {
 		return
 	}
@@ -75,6 +79,7 @@ func (b *backPressure) Wait() {
 	b.cond.L.Lock()
 	defer b.cond.L.Unlock()
 
+	// 没有关闭且处理pause状态的connection，阻塞
 	for !b.closed && b.paused {
 		b.cond.Wait()
 	}
