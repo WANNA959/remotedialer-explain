@@ -29,8 +29,6 @@ See also:
 
 # Usage Demo
 
-
-
 ## demo code分析
 
 对code不关心可以仅关注命令行参数即可，直接跳到[HTTP下使用](#http下使用)
@@ -158,11 +156,7 @@ go run ./client/main.go -id wanna2 -connect ws://localhost:8125/connect
 
 **综上分析，peers的功能就是可以发现peers关系中所有已经connect的clientKey-session，而转发请求可以对任意正在监听的server**
 
-## Todo
-
- 进一步验证session、client等结构和实际连接的对应关系
-
-重点关注session_manager的add、remove方法
+## demo链路跟踪
 
 ```
 # 操作：启动peer0 peer1 server2
@@ -217,3 +211,8 @@ server2
 
 ![时序图](https://tva1.sinaimg.cn/large/e6c9d24ely1h0n9k3gylij21b50u0gog.jpg)
 
+## Todo
+
+ 进一步验证session、client等结构和实际连接的对应关系
+
+重点关注session_manager的add、remove方法
