@@ -153,11 +153,13 @@ func newServerMessage(reader io.Reader) (*message, error) {
 	}
 
 	// 三个 read int64
+	// 根据readerdecode build a message
 	m := &message{
 		id:          id,
 		messageType: messageType(mType),
 		connID:      connID,
-		body:        buf,
+		// 此处为body，不是bytes
+		body: buf,
 	}
 
 	if m.messageType == Data || m.messageType == Connect {
@@ -228,7 +230,7 @@ func (m *message) header(space int) []byte {
 	offset += binary.PutVarint(buf[offset:], m.connID)
 	offset += binary.PutVarint(buf[offset:], int64(m.messageType))
 	if m.messageType == Data || m.messageType == Connect {
-		// 15s
+		// 15s？
 		offset += binary.PutVarint(buf[offset:], legacyDeadline)
 	}
 	return buf[:offset]
