@@ -201,7 +201,7 @@ server2
 接受 http请求：/client/wanna1/healthz 
 ```
 
-![时序图](/Users/zhujianxing/GoLandProjects/remotedialer/images/时序图.jpeg)
+![时序图](https://tva1.sinaimg.cn/large/e6c9d24ely1h0n9k3gylij21b50u0gog.jpg)
 
 # Http vs Websocket
 
