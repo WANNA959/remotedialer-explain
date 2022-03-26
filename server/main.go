@@ -33,7 +33,7 @@ func authorizer(req *http.Request) (string, bool, error) {
 func Client(server *remotedialer.Server, rw http.ResponseWriter, req *http.Request) {
 	timeout := req.URL.Query().Get("timeout")
 	name := req.URL.Query().Get("name")
-	fmt.Printf("name=%s", name)
+	fmt.Printf("name=%s\n", name)
 	if timeout == "" {
 		timeout = "15"
 	}
@@ -59,6 +59,7 @@ func Client(server *remotedialer.Server, rw http.ResponseWriter, req *http.Reque
 	defer resp.Body.Close()
 
 	logrus.Infof("[%03d] REQ OK t=%s %s", id, timeout, url)
+	// 代理请求结果写入 ResponseWriter
 	rw.WriteHeader(resp.StatusCode)
 	io.Copy(rw, resp.Body)
 	logrus.Infof("[%03d] REQ DONE t=%s %s", id, timeout, url)
@@ -139,7 +140,7 @@ func main() {
 
 	// 代理转发，四个参数
 	router.HandleFunc("/client/{id}/{scheme}/{host}{path:.*}", func(rw http.ResponseWriter, request *http.Request) {
-		fmt.Printf("handler get request(proto=%+v) path:%+v", request.Proto, request.URL.Path)
+		fmt.Printf("handler get request(proto=%+v) path:%+v\n", request.Proto, request.URL.Path)
 		Client(handler, rw, request)
 	})
 

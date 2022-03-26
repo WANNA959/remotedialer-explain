@@ -123,8 +123,8 @@ func (s *Session) Serve(ctx context.Context) (int, error) {
 	// 持续serve(读消息
 	for {
 		// mytype = TextMessage or BinaryMessage
-		fmt.Println("serve")
 		msType, reader, err := s.conn.NextReader()
+		fmt.Println("serve get message")
 		//TextMessage = 1 BinaryMessage = 2
 		fmt.Printf("msType=%d\n", msType)
 		//fmt.Println(msType)
@@ -147,13 +147,13 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 
 	// 解码 得到request message
 	message, err := newServerMessage(reader)
-	fmt.Printf("message:%+v\n", message)
+	fmt.Printf("get a message:%+v\nbyte=%+v\n", *message, string(message.bytes))
 	if err != nil {
 		return err
 	}
 
 	if PrintTunnelData {
-		logrus.Debug("REQUEST ", message)
+		logrus.Debug("REQUEST ", *message)
 	}
 
 	/*
@@ -197,6 +197,7 @@ func (s *Session) serveMessage(ctx context.Context, reader io.Reader) error {
 
 	// conn!=nil 下面四种类型都需要conn非空，即存在对应connid的connection
 	switch message.messageType {
+	// 处理data类型的message
 	case Data:
 		if err := conn.OnData(message); err != nil {
 			s.closeConnection(message.connID, err)
@@ -295,7 +296,7 @@ func (s *Session) clientConnect(ctx context.Context, message *message) {
 	}
 	s.Unlock()
 
-	fmt.Println("client dial here")
+	fmt.Printf("client dial here conn=%+v\nmessage:%+v\nbody=%+v\n", *conn, *message, string(message.bytes))
 	go clientDial(ctx, s.dialer, conn, message)
 }
 

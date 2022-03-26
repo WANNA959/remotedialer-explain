@@ -242,6 +242,7 @@ func (m *message) Read(p []byte) (int, error) {
 
 func (m *message) WriteTo(deadline time.Time, wsConn *wsConn) (int, error) {
 	// 将m(encode to bytes)写到websocket中，类型为BinaryMessage
+	fmt.Printf("write message:%+v\nbyte=%+v\n", *m, string(m.bytes))
 	err := wsConn.WriteMessage(websocket.BinaryMessage, deadline, m.Bytes())
 	return len(m.bytes), err
 }

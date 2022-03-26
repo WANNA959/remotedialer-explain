@@ -35,6 +35,7 @@ func newSessionManager() *sessionManager {
 // 根据不同的protocol构建 proto + address string 并构建server netConn(session
 func toDialer(s *Session, prefix string) Dialer {
 	return func(ctx context.Context, proto, address string) (net.Conn, error) {
+		fmt.Printf("find dialer session:%+v\n", *s)
 		if prefix == "" {
 			return s.serverConnectContext(ctx, proto, address)
 		}

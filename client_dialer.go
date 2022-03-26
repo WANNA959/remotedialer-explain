@@ -2,7 +2,6 @@ package remotedialer
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"net"
 	"sync"
@@ -17,7 +16,7 @@ func clientDial(ctx context.Context, dialer Dialer, conn *connection, message *m
 		err     error
 	)
 
-	fmt.Printf("client dial message=%+v", *message)
+	//fmt.Printf("client dial message=%+v", *message)
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(time.Minute))
 	// dial proto address
 	// get  dial server

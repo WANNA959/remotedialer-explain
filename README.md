@@ -150,6 +150,59 @@ go run ./client/main.go -id wanna2 -connect ws://localhost:8125/connect
 
 重点关注session_manager的add、remove方法
 
+```
+# 操作：启动peer0 peer1 server2
+peer0 8123
+peer1 8124
+server2 8125
+
+peer0
+write ADDCLIENT address:peer1/5577006791947779410
+get ADDCLIENT [peer0/5577006791947779410]
+
+peer1 
+write ADDCLIENT address:peer1/5577006791947779410
+get ADDCLIENT [peer0/5577006791947779410]
+均加入到peers中 len(peers)=1
+
+# 操作client connect peer0
+client connect peer0 
+
+peer0 
+handle connect len(clients)=1 
+write ADDCLIENT wanna1/4037200794235010051
+
+peer1
+get ADDCLIENT [wanna1/4037200794235010051]
+
+# 操作postman 请求  ws://localhost:8124/client/wanna1/http/localhost:8125/client/wanna1/healthz?name=zhujian&timeout=1
+具体交互过程如下面时序图所示
+
+peer1 
+接受 http请求：/client/wanna1/http/localhost:8125/client/wanna1/healthz
+write Connect 9075334938635334801 to peer0 byte=wanna1::tcp/localhost:8125
+write Data 9075334938635334802 to peer0 
+get Data 6457154278583150539 from peer0
+
+peer0 
+get Connect 9075334938635334801 from peer1 
+write Connect 6457154278583150537 to client
+get Data 9075334938635334802 from peer1
+write Data 6457154278583150538 to client
+get Data 1178506748663006651 from client
+write Data 6457154278583150539 to peer1
+
+client 
+get CONNECT 6457154278583150537 from peer0
+get Data 6457154278583150538 from peer0
+write 1178506748663006651 to peer0
+
+server2 
+接受 http请求：/client/wanna1/healthz 
+```
+
+![时序图](/Users/zhujianxing/GoLandProjects/remotedialer/images/时序图.jpeg)
+
 # Http vs Websocket
 
 - http/https
@@ -286,6 +339,16 @@ type message struct {
 	address     string
 }
 
+const (
+	// auto increase
+	Data messageType = iota + 1
+	Connect
+	Error
+	AddClient
+	RemoveClient
+	Pause
+	Resume
+)
 
 //data类型
 func newMessage(connID int64, bytes []byte) *message {
