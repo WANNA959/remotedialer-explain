@@ -1,8 +1,11 @@
 # 目录
+* [目录](#目录)
+* [源码分析](#源码分析)
 * [About Reverse Tunneling Dialer](#about-reverse-tunneling-dialer)
 * [Usage Demo](#usage-demo)
    * [demo code分析](#demo-code分析)
    * [HTTP下使用](#http下使用)
+   * [demo链路跟踪](#demo链路跟踪)
    * [Todo](#todo)
 
 # 源码分析
@@ -32,25 +35,11 @@ See also:
 
 ## demo code分析
 
-对code不关心可以仅关注命令行参数即可，直接跳到[HTTP下使用](#http下使用)
+demo code详细分析：[usage-demo-code-explain](usage-demo-code-explain.md)
 
-> client
+## HTTP下使用
 
-- flag解析命令行参数
-
-| 参数名称 | 参数意义                    |
-| -------- | --------------------------- |
-| -connect | ws://localhost:8123/connect |
-| -id      | clientId（clientKey         |
-| -debug   | debug log or not            |
-
-- 发送connect请求，注册一个client id—session
-- header中包含client id
-- remotedialer.ClientConnect(ctx, addr, headers, nil, func(string, string) bool { return true }, nil)——ConnectToProxy
-  - ws, resp, err := dialer.DialContext(rootCtx, proxyURL, headers)
-  - 新建一个session：session := NewClientSession(auth, ws)
-
-> Server
+> server
 
 - flag解析命令行参数
 
@@ -61,51 +50,6 @@ See also:
 | -token   | peer token                                            |
 | -peers   | 该server的Peers集合，格式为 id:token:url,id:token:url |
 | -debug   | debug log or not                                      |
-
-- 实例化一个server
-  - 该server实现了http.handler接口的ServeHTTP方法，所以可作为handler
-- 根据peers参数添加peer
-  - 要求该server自身也必须有id+token（相互add需要
-  - 根据参数实例化peer，添加到peers map
-  - go peer.start(ctx, s)
-    - 构建向peer请求的client（试图连接其他rancher server
-      - header中包含peer的id和token
-      - 每5s请求一次
-    - 根据ws创建一个session
-    - s.sessions.addListener(session)
-      - sm.listeners[listener] = true
-      - 遍历sm.peers+sm.client，添加newAddClient message
-        - 接收newAddClient message处理：addRemoteClient—处理remoteClientKeys
-
-- handler
-  - /connect
-    - ServeHTTP
-      - 认证通过（peer标记是哪种情况认证通过
-        - peer=true：id+token为peers中的某一个peer id+token
-        - peer=false：该server自定义认证规则
-      - 将一个http请求，upgrade为一个websocket请求
-      - session := s.sessions.add(clientKey, wsConn, peer)
-        - sessionKey := rand.Int63()
-        - 创建一个session：session := newSession(sessionKey, clientKey, conn)
-        - session_manager
-          - peer=true：sm.peers[clientKey] = append(sm.peers[clientKey], session)
-          - peer=false：sm.clients[clientKey] = append(sm.clients[clientKey], session)
-        - 遍历sm.listeners（本质为若干个session
-          - _, err := s.writeMessage(time.Time{}, newAddClient(client))
-            - client为clientKey和sessionKey拼接而成
-      - session.Serve
-  - /client/{id}/{scheme}/{host}{path:.*}：代理转发
-    - url := fmt.Sprintf("%s://%s%s", vars["scheme"], vars["host"], vars["path"])
-      - scheme表示协议
-      - host+path
-    - id作为clientkey找到client := getClient(server, clientKey, timeout)
-    - resp, err := client.Get(url)
-  - /client/{id}/healthz：自定义handleFunc
-    - response：resStr := fmt.Sprintf("addrss:%s receive name=%s from client:%s\n", addr, name, id)
-
-## HTTP下使用
-
-> server
 
 ```shell
 # 起2个server，必须都带有peer id & peer token，且均在peers中配置，否则handsshake失败
@@ -126,6 +70,14 @@ go run ./server/main.go -listen :8125
 | peer1     | localhost:8124 |
 
 > client
+
+- flag解析命令行参数
+
+| 参数名称 | 参数意义                    |
+| -------- | --------------------------- |
+| -connect | ws://localhost:8123/connect |
+| -id      | clientId（clientKey         |
+| -debug   | debug log or not            |
 
 ```shell
 # client1 connect到peer0，即localhost:8123
